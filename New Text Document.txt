@@ -1,0 +1,72 @@
+git config --global user.name 'qtdevops'
+git config --global user.email 'qtdevops@gmail.com'					#Configuring git
+git init										#Initialize a repository
+Three Areas of Git
+1. Working tree
+2. staging area
+3. local repository
+git status
+git add . 
+git add <file-name>
+git commit -m "<commit message>"
+git log
+git log --oneline
+git checkout <commit id>								#move head to the particular commit
+git checkout master 									#move the HEAD back to latest version
+git diff
+git restore --staged <file>								#to unstage i.e to move to working tree from staging area tracked 
+git restore --staged --worktree <file>							#to delete tracked file from staging area without going to work tree
+git checkout --<file>									#to delete tracked file from worktree
+git clean -fd <file>									#remove the untracked files from your working tree
+git reset --hard <commit id> or HEAD~X			#clean/remove all the changes done in working tree as well as staging area
+git reflog		#gits  log to recover the lost commits using git reset --hard <commit id>
+git reset --soft <commit id> or HEAD~X				#from local rep to staging area
+git reset --mixed <commit id> or HEAD~X				#from local repo to working tree
+#we we do git status after executing one of the above two commands, the changes are shown, you can use them or discard them
+#we we do git status after executing hard,changes are not shown, everthing is clean, so do not use hard reset
+git branch				#To view all the branches in your local repo
+git branch <branch-name>			#create a new branch
+git checkout <branch-name>			#move head to specific branch
+git checkout master				#move to master branch
+git checkout -b <new-branch-name>               #create a new branch and move the HEAD to the new branch
+git log --graph --decorate --pretty=oneline --abbrev-commit				#view the history
+git merge REL_1.0			#to merge from REL_1.0 to master, move to Master using git checkout master and execute
+git reset --merge				#to undo merge
+git add . && git commit				#After fixing conflicts and saving the files execute
+#merge is of two types
+1.fast forward merge				#no merge conflicts
+2.classical merge                               #creates one extra commit merge conflicts arises
+git cherry-pick <commit id>
+#head points to a commit id rather than branch. This state is called as Detached HEAD.
+#Now lets assume there is an import change that is done on master,Now this change has to be present in REL_1.2 branch also. If the REL_1.2 branch was created after this important change then it would be smooth
+ In Git this is possible to do with the help of rebase command.
+ first chekout to paricular branch where chenge is required, execute following commands
+git checkout <branch name other than master>
+git rebase master
+git add .
+git rebase --continue
+git rebase --abort 			#to abort and get back to previous state
+git commit --amend			#made a typo and we want to correct it
+git rebase -i <HEAD~Position>		#to rewrite history we can use interactive rebasing
+#for above mentioned commit we have
+#pick = no change
+#reword = edit commit message not code
+#edit = edit code not commit message
+#squash = meld into previous commit
+drop = delete commit
+------------------------------
+#git remote
+git remote add '<name-of-remote>' '<url-of-remote>'
+git remote add origin 'https://github.com/GitPracticeRepo/understanding.git'
+git push <name-of-remote> <branch-to-push>
+git push origin master
+git branch -r 				#list remote branches
+git push origin <remote branch name>    # to push to particular branch
+git clone https://github.com/GitPracticeRepo/understanding.git    		#copy remote repository to local host
+git fork https://github.com/GitPracticeRepo/understanding.git			#copy remote repo from others account to our account
+#Git pull => git fetch + git merge
+git pull origin <remote branch name>    # to pull to particular branch
+git pull --rebase = If we use git pull then it will create an extra commit which user1 doesn’t like so he uses the following command 
+git config --global alias.<name> 'log –graph –decorate –pretty=oneline –abbrev-commit'           #to create alias
+#Git Ignore = In the .gitignore file specify the files and folders which you want to ignores which you want to ignore
+#git branch --set-upstream-to=origin/master master = When you set up local repo first and then push the changes then we need to set the upstream
