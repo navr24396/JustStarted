@@ -1,0 +1,48 @@
+install helm 
+https://helm.sh/docs/intro/install/
+helm create <chart-name>					#to create a chart (create chart)
+you will see yaml files created automatically like deployment.yaml,service.yaml,ingress.yaml,serviceaccount.yaml,chart.yaml,values.yaml
+.helmignore,testconnection.yaml etc
+#to create from scratch delete all expect what is required
+#to avoid hard coding in deployments.yaml, create values.yaml and refer it in deployments file using
+{{.values.deployments.xxx}}
+ls 								#you must see directory with above created chart name
+cd <path>							#here contents of helm chart should be present
+helm install <chart-name> . 					#for deploying the yaml manifests,  . represents the yaml files are present in current directory
+								 (deploy the chart)
+alias k= kubernets						#to avoid typing kubernetes always and instead use k
+kubectl get deploy						#you will see deployments created here
+kubectl get svc							#you will see svc creted
+#you wll see everything object mentioned in specified object created
+helm list 							#to list the available charts(view chart)
+helm uninstall <chart-name>					#to delete entire chart i.e everything gets deleted (delete chart)
+helm lint 							#validating chart, shows an error if it is present i.e tests chart for errors
+helm template .    						#shows all files that we write in yaml format in stdout format
+								 you can look for any missing items here
+helm template . | kubectl apply -f -				#same as above two commands, above three can be used to figure out error
+-----------------
+under templates
+NOTES.txt gives the complete information about application to the user
+-helpers.tpl has nothing to do with objects or resources
+chart.yml is used to update the version of the app  #when you run helm list you will the app version similar to what is in chart.yml
+#if we have multiple values.yml files, by default it takes the one with name matching exatly values.yml, but if we want to use other file
+let us say new-values.yml then to deploy we use below command
+helm install <chart-name> . -f new-values.yml				#now it will use new-values.yml and -f stands for file
+helm list								#you will see chart created
+----------- 
+#if we want to refer labels under match labels we have to create a file *.tpl in which data is written as shown
+{{. define "labels" -}}
+app: nginx
+version: v1
+team: production
+{{- end .}}
+--------------------
+and in deployments.yaml 
+labels: {{- include "labels" . | nindent 4 }}     			#4 means 4 spaces should be there
+--------------------------
+#if we want to create multiple containers i.e specify multiple containers in deployment file based on condition we use if statement
+#we have to create a _<name>.tpl under template > tests
+#in deployment the data modified is as follows
+{{. if eq ..container1.Valuesenabled true -}}
+{{. include "container1" . | nindent}}
+

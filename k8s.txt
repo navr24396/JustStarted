@@ -1,0 +1,13 @@
+kubectl get nodes
+kubectl apply -f <yaml file> .
+kubectl get <object> --all-namespaces						#to get the objects from all namespaces
+kubectl get <object> --namespace <name>						# get the object from a specific namespace other than default
+kubectl logs <pod-name>								#Viewing logs
+kubectl exec <pod-name> -- <command>						#Executing commands inside a container with in a pod
+kubectl exec -it <pod-name> -- bash						#To login into the container in a terminal
+kubectl get pods								#to list pods
+kubectl describe pods <pod name>						#to describe  pods
+kubectl autoscale rs nginx-rs --min=3 --max=6 --cpu-percent=80			#hpa
+kubectl rollout history deployment <deploy name>
+kubectl rollout undo deployment myapp-deploy --to-revision=1
+kubectl rollout restart
