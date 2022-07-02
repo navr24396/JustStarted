@@ -1,0 +1,179 @@
+ curl -fsSL https://get.docker.com -o get-docker.sh
+    2  sh get-docker.sh
+    3  docker version
+    4  sudo usermod -aG docker ubuntu
+    5  exit
+    6  docker version
+    7  mkdir rrr
+    8  cd rrr/
+    9  vi Dockerfile
+   10  ls
+   11  docker image build -t rrr .
+   12  ls
+   13  docker container ls
+   14  docker container ls -a
+   15  exit
+   16  docker container ls -a
+   17  cd rrr/
+   18  docker container run --name 1st -d -p 5050:8080 rrr
+   19  docker container ls -a
+   20  history
+   21  cd ..
+   22  docker container run --name -d -p 6060:8080 -it openjdk:11 /bin/bash
+   23  docker container run --name 2nd -d -p 6060:8080 -it openjdk:11 /bin/bash
+   24  ls
+   25  docker container ls -a
+   26  docker container exec -it 2nd /bin/bash
+   27  docker container run --name 3rd -d -p 7070:8080 -it ubuntu /bin/bash
+   28  docker container ls -a
+   29  docker container exec -it 3rd /bin/bash
+   30  wget https://referenceapplicationskhaja.s3.us-west-2.amazonaws.com/spring-petclinic-2.4.2.jar
+   31  java -jar spring-petclinic.jar
+   32  docker container ls
+   33  docker container exec -it 3rd /bin/bash
+   34  exit
+   35  history
+-----------------------------------------------------------------------
+docker image pull openjdk:8
+    2  docker image inspect openjdk:8 
+    3  docker image pull openjdk:11
+    4  docker image inspect openjdk:11
+    5  docker ps -s
+    6  docker -ps -s
+    7  mkdir spc
+    8  cd 
+    9  cd spc/
+   10  vi Dockerfile
+   11  docker image ls
+   12  docker image build -t spc:1 .
+   13  docker image ls
+   14  cd ..
+   15  docker ps -s
+   16  docker container run --name 1st -d -P spc:1
+   17  docker container ls
+   18  docker container ls -a
+   19  docker container run --name 2st -d -P spc:1 sleep 1d
+   20  docker container ls 
+   21  docker container inspect 2nd
+   22  docker container inspect 2st
+   23  docker ps -s
+   24  docker image ls
+   25  cd spc/
+   26  cat hii
+   27  cat > hii baganura
+   28  cat >> hii baganura
+   29  vi hii
+   30  docker image inspect
+   31  cd ..
+   32  docker image ls
+   33  docker container ls
+   34  docker ps -s
+   35  cd spc/
+   36  ls
+   37  cd ..
+   38  docker ps -s
+   39  cd spc/
+   40  ls
+   41  cat Dockerfile 
+   42  cat hii 
+   43  nano eddfdeff
+   44  vi ehdwkidewd
+   45  cd ..
+   46  docker ps -s
+   47  history
+   48  docker info
+   49  docker container ls -s
+   50  history
+
+----------------------------------------------------------
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+docker version
+sudo usermod -aG docker ubuntu
+exit
+docker version
+docker container run <docker-image>
+docker pull <image>								#pull the image
+docker container ls								#lists running containers
+docker container ls -a								#lists container irrespective of their current state
+docker container run --name <name> <docker-image>				#container from some image with a name
+docker container run -d <image-name> 						#run in background mode(detached mode)
+docker container rm <container id or name>					#to remove stopped container
+docker container rm -f <container id or name>					#to remove running as well as stopped container
+docker container rm -f $(docker container ls -q)				#to remove all the running containers 
+docker container rm -f $(docker container ls -a -q)				#to remove all the containers
+docker container start <container id or name>					#to start container
+docker container stop <container id or name>					#to stop container
+docker container inspect <container-name/id>					#to get the information about container 
+docker container attach <container-name/id					#to attach to the container that is in detached mode
+docker container logs <container-name>						#to view logs
+docker container logs --tail 5 <container-name>					#to get only last few entries
+docker container logs --tail 5 --follow <container-name>			#to follow the logs
+docker container run -p <port on host>:<container port> <image>			#to manually map ports
+docker container run -P <image>							#dynamically port forwarding
+docker container exec <container-name> <command>				#to execute commands in docker container
+docker container exec -it <container> <terminal>				#to login into docker container terminal for already created container
+docker image build -t <image-name>:<tag> <path to folder where Dockerfile> 	#to build a docker image
+docker image inspect <image-name> 						#to get the information about image
+docker container logs <container name>						#to view logs	
+docker container run --name memcpujenkins -P -d --memory 1024m --cpus="2" jenkins/jenkins	#to restrict memory and cpu while starting a container
+docker ps -s 									#shows container size
+
+volume commands
+---------------
+docker volume create <name of volume you want to create>				#to create volume
+#this volume is present in var/lib/docker/volume/<volume name>
+docker volume inspect <name of volume>						##to get the information about volume
+docker volume ls									#to list volume
+docker container run -d --name <name of cont> <iamge> -p <port on host>:<container port> -v <name of volume created>:<path on container>
+#to check if this volume is mounted in container execute following
+docker container exec -it <container name> /bin/bash
+ls				#you will find volume created here
+cd <created volume name>
+touch 1.txt 2.txt
+exit
+#now if we do ls var/lib/docker/volume/<volume name>   you will see this is replicated here
+#even if the container is deleted this volume wont get deleted
+#you can mount this volume to another container also using following command
+docker container run -d --name <name of cont> <iamge> -p <port on host>:<container port> -v <name of volume created>:<path on container>
+#you will see the contents of the volume created inside container,which you can find by exec into container
+docker container exec -it <container name> /bin/bash
+--------------------------------------
+docker ps -s 				#shows container size i.e amount of data used for writable layer, 
+					 virtual size => virtual size of container i.e. image layers size plus writable layer size
+------------------------------------------------------------------------
+Dockerfile instructions
+***********************
+FROM = Using this we can define base image for building our custom application image
+LABEL = Adds metadata to the image
+RUN =  This instruction executes any valid command
+EXPOSE = tells docker that container is listening to the to the specific netowrk port
+WORKDIR = This instruction defines the working directory. If not specified / is the default workdir
+CMD = This instruction is executed when container is created and can be overritten by passing arguments when creating container
+ENTRYPOINT = This instruction is executed when the container is created and cannot be overritten by passing arguments when creating container
+ARG = This instruction can be helpful in defining the variable and pass argument during build time, The arguments can be passed from docker command line 
+      docker image build –build-arg <arg>=value
+      for eg. ARG DOWNLOAD_URL
+              ADD ${DOWNLOAD_URL} /spring-petclinic.jar
+ENV = This instruction sets the environmental variable and is available while running the container and this can be changed while running your container
+----------------------------------------------------------------------------------------------------
+Docker Native Network Drivers
+*****************************
+Bridge = dockers default network
+host = Container uses the networking stack of the host
+none
+------------------------------------------------------------------------------------------------------
+docker has three networks bridge, host and none
+bridege is defaukt network and i.e docker0
+whenever we create any container it is launched in docker0 network
+docker network ls  = list the available networks
+ip a  = to show the  details of available networks
+when ever a container is created network is created, and vice verse
+docker inspect bridege = to see which containers are using bridge network
+to create a network = docker network create --driver=bridge --subnet=<cidr/*>  --gateway=<cidr>
+docker network ls = to see available networks
+to create a container in a particular network =
+docker container run --network <network name> * ** * * * 
+to establish connection between two containers in different network =
+docker network connect <network name> <container name>
+to remove a network = docker network rm <network name>
