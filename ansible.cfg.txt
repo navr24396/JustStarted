@@ -1,0 +1,1002 @@
+ansible -i <inventory file path> 			#for defining inventory file
+#alternatively add path of inventory file in ansible.cfg file as shown below
+#ansible.cfg is configuration file for ansible
+[defaults]
+inventory = <path to inventory> 				#now no need of -i flag in ad-hoc command
+
+ad-hoc commans
+ansible -i <inventory path> <group> -m <module> -a "<command>"
+ansible -i /home/ashok/hosts all -m shell -a "free -m"
+ansible-doc -l 					#shows all ansible modules present
+ansible-doc -l >> ansible_module.txt		#writes output to a text file
+ansible-doc -l | wc -l 				#shows no of modules avaialble in ansible 
+ansible-doc -l | grep aws			#shows all avaialble modules for aws, similarly for all
+#ansible engine creates a python file while executing commands on clients and copies this file temporarily to the client server users home directory under .ansible/temp, 
+this file gets deleted as soon as the command is executed, this is why python is required on the client machine && how commands are executed in clients
+#to retain the temp file created,just to see use below command
+ANSIBLE_KEEP_REMOTE_FILES=1 ansible -i <inventory path> <group> -m <module> -a "<command>"
+#now go to clients home directory under .ansibele/temp you will see the python file
+*copy files on ansible client from ansible controller
+ansible <group> -m copy -a "src=source path dest=dest path"
+#if dest= /tmp then file is copied to servers default users for eg. ec2-user,ubuntu home directory under mentioned path
+#if the same command is executed several times changed is false
+#if copied file is modified by the client and the same command is executed again, then change is true and src is visible,md5sum is also visible(means checksum is updated) for that particular clent
+#if file is modified by the engine and the same command is executed again, then change is true and src is visible,md5sum is also visible(means checksum is updated)
+*copy content to a file
+ansible <group> -m copy -a "content='<content>' dest=complete dest path"
+ansible <group> -m copy -a "content='hi ra' dest=/tmp/ansible_sample.txt"
+*create file on client
+ansible <group> -m file -a "path=file or directory destination location state=<state>"
+ansible <group> -m file -a "path=/tmp/ashok.txt location state=touch"				#create file
+ansible <group> -m file -a "path=/tmp/ashok.txt location state=absent"				#deletes file
+ansible <group> -m file -a "path=/tmp/ashok.txt location state=touch mode=0664"			#modify permissions as well
+*create directory on client
+ansible <group> -m file -a "path=/tmp/ashok location state=directory"				#creates directory
+ansible <group> -m file -a "path=/tmp/ashok location state=absent"				#deletes directory
+*install packages on client
+ansible <group> -m yum -a "name=nginx state=present"						#checks if nginx is present
+ansible <group> -m yum -a "name=git state=present"						#if this throws an error as you can only execute as root user then use below command
+ansible <group> -m yum -a "name=nginx state=present" -b 					#execute this as a root user, so above error doesnt show up
+ansible <group> -m yum -a "name=nginx state=latest" -b						#update package
+ansible <group> -m setup									#shows complete info about remote machine or client
+ansible <group> -m setup -a "filter=ansible_memory_mb"						#filter the specified
+#facts means the factual data about client, eg. system information
+ansible-doc <module name>									#gives info about specified module
+*types of facts
+1.default facts
+2.custom facts : used to get extra information about managed nodes eg. versions of packages like git, httpd etc.
+#watch class for further info   #little complicated
+*types of inventory
+1.static inventory
+2.dynamic inventory
+#in dynamic inventory no need to mention ips of clients in inventory file, it takes values dynamically
+#take a situation in which there are 100's of servers, we cannot add each ip of clients in inventory as this is tiresome, in this case we use dynamic inventory
+ansible-doc -t inventory -l				#lists all dynamic inventory plugin list
+ansible-doc -t inventory -l >> ansible_plugin.txt	#writing output to a file
+cat ansible_plugin.txt
+#to use dynamic inventory add following in ansible.cfg file
+vi ansible.cfg
+[inventory]
+enable_plugins = host_list,script,auto,yaml,ini,toml
+#now install boto3 in engine
+#now do aws configure and add keys in engine
+#now create an yaml file
+vi aws_ashok.yml
+plugin: amazon.aws.aws_ec2
+
+#you can get this path i.e amazon.aws.aws_ec2 by executing ansible-doc -t inventory -l
+ansible-inventory -i aws_ashok.yml --list			#you will get complete details of all running instance in the account
+ansible-inventory -i aws_ashok.yml --graph			#lists only running instances ips or dns	
+#now launch a new instance in aws and execute the above command, you will see the newly added instance as well
+ansible all -i aws_ashok.yaml -m ping				#if this gets failed by showing error as you cannot do this by root user, pass username in the command by -u flag as shown below
+ansible all -i aws_ashok.yaml -u ec2-user -m ping
+#we can also apply filters for eg, we want the command to be executed only on running instances, then we have to modify the dynamic inventory i.e yaml file to add filters as shown below
+vi aws_ashok.yml
+plugin: amazon.aws.aws_ec2
+filters:
+  instance-state-name: running 
+
+ansible all -i aws_ashok.yaml -u ec2-user -m ping				#now only on running nodes this command is executed,since we have added filters in dynamic inventory file
+
+*playbooks
+#ad-hoc commands are used when executing a single task or command, but when multiple tasks or sequence of commands to be executed on clicks,then playbooks should be used
+#structure of playbooks
+  concepts
+   1.tasks
+   2. play
+   3. playbooks
+#task is the operation to perform
+#play is a combination of targets(hosts) and tasks
+#playbook is a combination of plays or list or sequence of plays
+*sample palybook to ping
+vi sample.yaml
+- name: introduction
+  hosts: all
+  become: 'yes'
+  
+  tasks: 
+    - name: checking connection via ping
+      ping
+------------------------
+ansible-playbook -i <inventory path> <playbook name>					#to run playbook     (-u ec2-user  use if required)
+ansible-playbook i <inventory path> sample.yaml
+#following tasks are exucuted when playbook is run
+1.gathering facts 
+2.ping 
+so ok=2 (which means two tasks are executed), change=0 because nothing has changed in client
+---------
+*another sample playbook
+vi sample1.yaml
+- name: installing webserver
+  hosts: all
+  become: true
+  become_user: root
+  tasks:
+    - name: ensure apache is at latest version
+      yum: 
+        name: httpd
+        state: latest
+    - name: ensure apache is running
+      service: 
+        name: http
+        status: started
+
+-----------------
+ansible-playbook sample1.yaml -i <inventory path> -u ec2-user
+#here ok=3 because 3 tasks are executed i.e gathering facts, installing httpd and running httpd
+ changed=2 because 2 changes have been made i.e installing httpd and running httpd
+#if same playbook is executed again then ok will be 3 and changed will be 0
+#if we manually stop httpd by ssh into client and run the same playbook, then ok=3 and changed = 1 
+
+#if we dont want to execute long commands, instead run a playbbok by just entering its name and enter do the following
+1. add shebang and binary location of playbook in playbook itself (shown in sample playbook below)
+2. the static or dynamic inventory path should be in ansible.cfg file
+3. define remote ssh user in the playbook
+4. make sure yaml playbook file should have executable permission 775
+
+which ansible-playbook				#shows location of binary
+#copy this and add it as first line of ansible playbook
+vi sample1.yaml
+#!/root/ansible/myansible/bin/ansible-playbook
+|
+|
+-------
+vi ansible.cfg
+inventory = /root/ansible/<inventory yaml file name>						#specify complete path to dyanamic inventory file
+----
+add remote_user: ec2-user in playbook
+#chmod 775 -R  <playbook> 
+---
+#now just type playbook yaml file name and enter, and see that the playbook is automatically run without any flags
+#so the modified playbook looks as below
+sample1.yaml				#playbook starts running
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: installing webserver
+  hosts: all
+  remote_user: ec2-user
+  become: true
+  become_user: root
+  tasks:
+    - name: ensure apache is at latest version
+      yum: 
+        name: httpd
+        state: latest
+    - name: ensure apache is running
+      service: 
+        name: http
+        status: started
+------
+#modify other file i.e ping file i.e sample.yaml
+vi sample.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: introduction
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+  
+  tasks: 
+    - name: checking connection via ping
+      ping
+    - name: uninstall apache weberver
+      yum:
+        name: httpd
+        state: absent 
+
+*syntax check
+#to check the syntax of ansible playbook add this --syntax-check to the command used to run playbook
+ansible-playbook sample1.yaml -i <inventory path> -u <linux user> --syntax-check				#checks playbook syntax
+*dry run
+ansible-playbook sample1.yaml -i <inventory path> -u <linux user> --check					#execute playbook in dry ryn mode
+*verbose output
+ansible-playbook sample1.yaml -i <inventory path> -u <linux user> -v 						#execute playbook with verbose output
+#verbose output is similar to attached mode in docker container which means shows each step that is getting executed i.e extra logs
+------
+#debug Module is helpful for debugging variables and expressions   			#like output block in terraform
+#debug Module accepts three parameters.it prints variables during execution
+○ msg - print or logging statement
+○ var - variable which value user wants to print
+○ verbosity - Define verbosity of messages.
+#it simply just prints the messages and values of variables and verbosity(incresases by incresing no of v's)
+#see below playbook
+vi ansible_debug.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This is Overview of Ansible Debug Module
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  tasks:
+    - name: Task for Debug Module Messaging
+      debug:
+        msg: "Hi, this is Custom message for Debug Module"										#prints same
+    
+    - name: Prints two lines of messages
+      debug:
+        msg:																#prints same
+        - "Hi This is multiline message."
+        - "And I am line number 2..."
+    
+    - name: Print Varaible in messages
+      debug:
+        msg: 
+        - "Host IP is - {{ inventory_hostname }}"									#prints the same, value inside {{ }} is replaced by the actual value of it
+        - Host IP is - {{ inventory_hostname }}
+        - System {{ inventory_hostname }} has gateway {{ ansible_default_ipv4.gateway }}
+    
+    - name: debug module var parameter
+      debug:
+        var: inventory_hostname 											#prints just the value of inventory_hostname in this case
+    
+    - name: verbocity in debug module
+      debug:
+        msg: "Hi this is deep logging at deub level 2"									#shows extra logs
+        verbocity: 2
+----------
+*variables
+#define custom variables and use those custom variables in playbook is as follows
+#we can define them as key-value pairs under vars and use them with debug module to print them
+#we can also reference using var and key name in var and using {{<variable name>}} in msg
+vi ansible_var.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This is Overview of Ansible Debug Module
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  vars:
+    test: hello, this is dummy value
+    my_name: Anshul Chauhan
+    my_age: 31
+    my_height: 5.11
+    is_male: true
+
+  tasks:
+    - name: Reading Ansible Playbook varaible
+      debug:
+        var: test
+
+    - name: Reading Ansible Playbook varaibles
+      debug:
+        msg:
+        - My name is {{ my_name }}
+        - I am {{ my_age }} years old.
+        - And I am {{ my_height }} long, my gender is male - {{ is_male }}
+---------------------------------------
+*data collection or data store
+#it is used to store multiple values in single variable
+#observe the playbook to see the details
+vi ansible_datacollection.yaml
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This is Overview of Ansible Data Collection
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  vars:
+    xyz: Hello this is XYZ
+    packages: ['wget', 'unzip', 'curl', 'vim']
+    cities:
+    - New York
+    - London
+    - Tokyo
+    - Dubai
+    web_server: {'Linux': 'httpd', 'Unix': 'apache2'}
+
+  tasks:
+    - name: This is Data Collection Retrieval 
+      debug:
+        var: xyz 
+
+    - name: Getting Sequence Data Collection F 1
+      debug:
+        var: packages
+
+    - name: Getting Sequence Data Collection F 2
+      debug:
+        var: cities
+
+    - name: Getting Sequence Data Collection F 3
+      debug:
+        var: web_server
+-------------------
+*to store return data of a particular module
+#User can store the output of module using ansible registers module
+*Set_fact is used to store the Variable.
+#debug is used to print the variable
+#to better understand read below playbook
+vi register_ansible.yaml
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This is Overview of Ansible Register and Set_Fact
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  tasks:
+    - name: Retrive Installed Shell Version
+      shell: "bash --version"								#output of this module is stored in register i.e bash_ver
+      register: bash_ver
+
+    - set_fact:
+        bash_version: "{{bash_ver.stdout_lines[0].split()[3]}}"				#above output after filtering to get only required data is stored in set_fact as shown
+    
+    - debug:
+        var: bash_version 								#prints the value of mentioned var by refering set_fact
+-------------------
+*arithmatic operations in playbook
+#refer below playbook for understanding
+vi arithmatic_operations.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This is to Display Arithmetic Opeations on Varaibles
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    a : 10
+    b : 20 
+
+  tasks:
+    - name: Operations on variables
+      debug: 
+        msg:
+        - "value of a is : {{a}}"
+        - "value of b is : {{b}}"
+        - "Addtion of a & b : {{a + b}}"
+        - "Subs of a & b : {{a - b}}"
+        - "Multi of a & b : {{a * b}}"
+        - "Devide of a & b : {{a/b}}"
+-----------------------------------
+* here we can pass values of variables while executing playbook
+#also the value of variable is taken as string so add int in playbook in order to consider the manually passed value as integer
+#ref below playbook for understanding
+vi practice_arithmatic.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This is to Display Arithmetic Opeations on Varaibles
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    a : 10
+    b : "{{a*10}}"
+
+  vars_prompt:
+    - name : x
+      prompt: Please enter Value of x 
+      private: no
+
+    - name : y
+      prompt: Please eneter value of y
+      private: no
+
+  tasks:
+    - name: Operations on variables											#for eg. x=2 & y=3
+      debug: 
+        msg:
+        - "value of a is : {{a}}"
+        - "value of b is : {{b}}"
+        - "Addition of User Defined Values x, y is : {{x+y}}"								#ans is 23					
+        - "Addition of User Defined Values x, y is : {{x|int + y|int}}"							#ans is 5
+        - "Multiple of User Defined Values x, y is : {{x|int * y|int}}"							#ans is 6
+---------------------
+*filter(denoted by symbol |) and method (denoted by .)
+#refer playbook for understanding
+vi filter_methods_ansible.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This is to Display filter and method Opeations on Varaibles
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    a : "HeLLo tHiS is ANSHUL and i aM a SoftWARE enginEER"
+    b : 10
+    c : "20"
+
+  tasks:
+    - name: Operations on variables
+      debug: 
+        msg:
+        - "value of a is : {{a}}"					#ans is HeLLo tHiS is ANSHUL and i aM a SoftWARE enginEER
+        - "value of b + c is : {{b+c|int}}"				#ans is 30
+        - "Small case value of a : {{a|lower}}"				#ans is hello this is anshul and i am a software engineer
+        - "Capital case Value of a: {{a|upper}}"			#ans is HELLO THIS IS ANSHUL AND I AM A SOFTWARE ENGINEER
+        - "Title Case value of a : {{a|title}}"				#ans is Hello This Is Anshul And I Am A Software Engineer
+        - "Small case value of a : {{a.lower()}}"			#ans is hello this is anshul and i am a software engineer
+        - "Capital case Value of a: {{a.upper()}}"			#ans is HELLO THIS IS ANSHUL AND I AM A SOFTWARE ENGINEER
+        - " Split of String a : {{a.split()}} " 			#ans is [ 'hello', 'this', 'is', 'anshul', 'and', 'i', 'am', 'a', 'software', 'engineer' ]
+---------------
+*comparison operator 
+Comparison Operators are helpful to work with conditional Operators.
+➢ Comparison Operators always return either True or False.
+➢ Comparison Operators Expressions are below
+== , != , > , < , >= , <=
+#refer playbook
+
+vi comparison_operator.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This will show the Use of Comparision Operators
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    a : "HELLO"
+    d : "hello"
+    b : 10
+    c : 20
+
+  tasks:
+    - name: Operations on variables
+      debug: 
+        msg:
+          - "The value of b is - {{ b }}, and Value of c is - {{ c }}"		#The value of b is - 10, and Value of c is - 20
+          - "Is b greater than c : {{ b > c }}"					#False
+          - "Is b less than c : {{ b < c }}"					#true
+          - "Is b equals to c : {{ b == c }}"					#false
+          - "Is b not equal to c : {{ b != c }}"				#true
+          - "Is b greater than or equal to c : {{ b >= c }}"			#false
+          - "Is b less than or equal to c : {{ b <= c }}"			#true
+          - "Below Comparision is for String"
+          - "The value of a is - {{ a }}, and Value of d is - {{ d }}"		#The value of a is - HELLO, and Value of d is - hello
+          - "Is a greater than d : {{ a > d }}"					#false		
+          - "Is a less than d : {{ a < d }}"					#true			
+          - "Is a equals to d : {{ a == d }}"					#false
+          - "Is a not equal to d : {{ a != d }}"				#true			
+          - "Is a equals to d : {{ a|lower == d }}"				#true
+-----------
+*Membership operator
+#‘in’ and ‘not in’ are the membership operators.
+Tests for variables -
+○ is defined
+○ is undefined
+➢ Tests for String -
+○ String is lower
+○ String is Upper
+○ String is String
+➢ Test for numbers
+○ Number is divisible by number
+○ Number is even
+○ Number is Odd
+○ Number is Number
+refer playbook
+vi membership_tests.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This will show the Use of Comparision Operators
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    a : "HELLO"
+    d : "hello"
+    b : 10
+    c : 20
+    e : [1,5,9,10,15,109]
+    x: "/root/ansible/operators_statement"
+    y: "/root/ansible/operators_statement/comparision_operator.yml"
+
+  tasks:
+    - name: Operations on variables
+      debug: 
+        msg:
+          - "The List is - {{ e }}, Value of c is - {{ c }} and Value of b is - {{ b }}"
+          - "Is b memeber of e : {{ b in e }}"
+          - "Is c memeber of e : {{ c in e }}"
+          - "Is 25 memeber of e : {{ 25 in e }}"
+          - "Is c not a memeber of e : {{ c not in e }}"
+
+    - name: Tests Operators
+      debug: 
+        msg:
+          - "a is defined?   {{ a is defined }}"
+          - "c is defined?   {{ c is defined }}"
+          - "a is Upper?   {{ a is upper }}"
+          - "b is Lower?   {{ b is lower }}"
+          - "e is String?   {{ e is string }}"
+          - "y is file:   {{ y is file }}"
+          - "x is directory: {{ x is directory }}"
+          - "y is directory: {{ y is directory }}"
+#for ans see screenshot 
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (341)
+----------------------------------------------------------------
+*logical operator
+ref. https://www.cs.utah.edu/~germain/PPS/Topics/truth_tables_and_logic.html
+# it is all about AND, OR, true,false
+vi logical_operator.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This will show the Use of Comparision Operators
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    a : "HELLO"
+    d : "hello"
+    b : 10
+    c : 20
+    e : [1,5,9,10,15,109]
+    x: true
+    y: false
+    z: false
+    m: true
+
+  tasks:
+    - name: Operations on variables
+      debug: 
+        msg:
+          - "x and y : {{ x and y }}"
+          - "x and m : {{ x and m }}"
+          - "x or m : {{ x or m }}"
+          - "y or z : {{ y or z}}"
+          - "x and y or m: {{ x and y or m}}"
+#for ans refer below
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (342)
+-------------------------------------------------------------------
+*condition statement
+#this is all about 'when', if condition is true only then play is execucted, if this is false play is skipped
+refer playbook
+vi condition_statement.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This is for Conditional Statement
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    x : 20
+    y : 10
+
+  tasks:
+    - name: Operation for Conditional Statement
+      debug: 
+        msg:
+          - "Value of x : {{ x }}, Value of y: {{ y }}"      
+
+    - name: Operation for Conditional Statement I
+      debug: 
+        msg:
+          - "x is Small of y"
+      when: x < y
+
+    - name: Operation for Conditional Statement II
+      debug: 
+        msg:
+          - "x is not Small then y"
+      when: x > y
+
+for ans ref
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (343)
+-----------------------------
+*handlers
+#if the tasks are dependent and one task is to be executed only if the other task on which it depends is execucted succuessfully,
+#to execute the dependent tasks handlers are used 
+#ref playbook
+vi handlers.yaml
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: Installing WebServer
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  tasks:
+    - name: Ensure Apache is at the Latest Version
+      yum:
+        name: httpd
+        state: present
+      notify:
+        - Ensure Apache is Running
+        - Ensure Apache restart 
+
+  handlers:
+    - name: Ensure Apache is Running
+      service:
+        name: httpd
+        state: started
+
+    - name: Ensure Apache restart
+      service:
+        name: httpd
+        state: restarted
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (344)
+-------------------------
+*loops
+#this is about iteration
+#this is about terms 'with_items' and 'with_together'
+#ref example
+
+vi loops_example1.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: Loops in Ansible Playbook Part I
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  vars:
+    alpha: [ 'a', 'b', 'c', 'd' ]
+    numbers:  [ 1, 2, 3, 4 ]
+
+  tasks:
+    # Add Multiple User's in one go
+    - name: add several users in one go
+      user:
+        name: "{{ item }}"
+        state: present
+        groups: "games"
+      with_items:
+        - testuser1
+        - testuser2
+        - testuser3
+        - testuser4
+        - testuser5
+    
+
+    - name: add several users
+      user:
+        name: "{{ item.name }}"
+        state: present
+        groups: "{{ item.groups }}"
+      with_items:
+        - { name: 'testuser6', groups: 'nobody' }
+        - { name: 'testuser7', groups: 'nobody' }
+        - { name: 'testuser8', groups: 'postfix' }
+        - { name: 'testuser9', groups: 'postfix' }
+    
+
+    - name: Loop Over Set of Collection variable
+      debug:
+        msg: "{{ item.0 }} and {{ item.1 }}"
+      with_together:
+        - "{{ alpha }}"
+        - "{{ numbers }}"
+----
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (345)
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (346)
+-------------------------------------
+*loops
+#this is about 'with_random_choice', 'with_indexed_items' 
+#ref example
+
+vi loops_example2.yaml
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: Loops in Ansible Playbook Part II
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  vars:
+    alpha: [ 'a', 'b', 'c', 'd' ]
+    numbers:  [ 1, 2, 3, 4 ]
+
+  tasks:
+    # Add Multiple User's in one go
+    - name : Random Looping Example
+      debug:
+        msg: "{{ item }}"
+      with_random_choice:
+        - "go through the door"
+        - "drink from the goblet"
+        - "press the red button"
+        - "do nothing"
+    
+
+    # Looping Over A List With An Index
+    - name: Looping over a List
+      debug:
+        msg: "At array position {{ item.0 }} there is a value {{ item.1 }}"
+      with_indexed_items:
+        - "{{ alpha }}"
+
+    # Do Until Loop
+    - name: Ensure Apache is Running
+      service:
+        name: httpd
+        state: started
+      register: result
+      until: result.changed == True
+      retries: 10
+      delay: 4
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (347)
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (348)
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (349)
+--------------
+*loops
+#this is about 'loop', 
+#ref example where multiple packages are installed
+vi loops_example.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: Loops in Ansible Playbook Part III
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  vars:
+    packages: [ 'gettext-devel', 'openssl-devel', 'perl-CPAN', 'perl-devel', 'zlib-devel', 'unzip', 'curl', 'wget' ]
+  tasks:
+    - name: Install Multiple Packages using Loop
+      yum:
+        name: '{{ item }}'
+        state: present
+      loop:
+        - gettext-devel
+        - openssl-devel
+        - perl-CPAN
+        - perl-devel
+        - zlib-devel
+        - unzip
+        - curl
+        - wget
+
+
+    - name: UnInstall Multiple Packages using Index Loop
+      yum:
+        name: '{{ item.1 }}'
+        state: absent
+      with_indexed_items:
+        - "{{ packages }}"
+
+
+    - name: Install Multiple Packages using Index Loop
+      yum:
+        name: '{{ item.0 }}'
+        state: present
+      with_together:
+        - "{{ packages }}"
+
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (350)
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (351)
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (352)
+------------
+*tags
+--tags <tage name>				#for single tags
+--tags <tag1,tag2>				#for multiple tags seperate by commas
+--skig-tags <tag name>				#skip the tasks with the mentioned tag
+--list-tags					#to list all tasks i.e only tag name is shown
+#tags are case sensitive
+#can associate single tag to multiple tasks and multiple tasks can have the same tag
+
+#ref example 
+vi tags_ansible.yaml
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: This will show the Use of Tags
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Operations using the Tags 1
+      debug: 
+        msg:
+          - "Hi, This is Debug Message 1 "
+      tags:
+        - first
+
+    - name: Operations using the Tags 2
+      debug: 
+        msg:
+          - "Hi, This is Debug Message 2 "
+      tags:
+        - Second
+        - Common
+
+    - name: Operations using the Tags 3
+      debug: 
+        msg:
+          - "Hi, This is Debug Message 3 "
+
+    - name: Operations using the Tags 4
+      debug: 
+        msg:
+          - "Hi, This is Debug Message 4 "
+
+    - name: Operations using the Tags 5
+      debug: 
+        msg:
+          - "Hi, This is Debug Message 5 "
+      tags:
+        - first
+
+    - name: Operations using the Tags 6
+      debug: 
+        msg:
+          - "Hi, This is Debug Message 6 "
+----------------------------------------
+*error handling
+#if a task is failed then subsequent tasks also gets failed, if we dont want this to happen we can inslude 'ignore_eroors: true' in the task
+#if we want to intentionally fail, we can include in th task 'failed_when'
+vi error_handling.yaml
+
+- name:  Error handling part 1 
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+  
+  tasks
+    - name: List all files/dir in etc
+      command: "ls /etcc"
+      register: home_out
+      ignore_errors: yes
+    - debug: var=home_out
+
+    - name: List all files/dir in tmp
+      command: "ls /tmp"
+      register: tmp_out
+    - debug: var=tmp_out
+
+    - name: List all files/dir in etc dir
+      command: "ls /etc"
+      register: etc_out
+    - debug: var=etc_out
+      failed_when: etc_out.rc==2						#failed if this condition is met, rc is taken once after task is executed (ignore if not understood)
+----------------------------------
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (353)
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (354)
+C:\Users\Ashok Vardhan Raju\Pictures\Screenshots\Screenshot (355)
+*error handling
+#this is about block, rescue and always
+#we can group several tasks into one by using block
+#rescue means when the tasks mentioned in bloack fails, rescue will clean up everything that has been half done i.e tasks in block
+#tasks mentioned in always gets always executed ireespective of failed tasks mentioned in block
+#ref two examples
+
+vi block_ansible.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: Ansible Blocks
+  hosts: all
+  remote_user: ec2-user
+
+  tasks:
+    - block:
+      - name: List usr directory content
+        command: "ls -l /usr/"
+        register: usr_out
+    
+      - name: List root partition content
+        command: "ls -l /roott/"
+        register: root_out
+
+      - name: List bin diretcory content
+        command: "ls -l /bin/"
+        register: bin_out
+      become: 'yes'
+      ignore_errors: yes
+
+    - name: List ansible user's home directory content
+      command: "ls -l ~/"
+      register: userhome_out
+
+    - debug: var=usr_out
+    - debug: var=root_out
+    - debug: var=userhome_out
+    #- debug: var=bin_out									'#'means comment out
+
+------
+vi rescue_block.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: Ansible Blocks
+  hosts: all
+  remote_user: ec2-user
+
+  tasks:
+    - block:
+        - name: List home directory content
+          command: ls -l ~/
+          
+        - name: Failing intentionally
+          command: ls -l /tmp/
+      become: 'yes'
+      #ignore_errors: yes
+
+      rescue:
+        - name: Rescue block (perform recovery)
+          debug:
+            msg: 'Something went wrong, cleaning up..'
+
+      always:
+        - name: This will execute always
+          debug:
+            msg: I will execute even in failure scenario
+-----------
+*error handling
+vi block_rescue_always.yaml
+
+#!/root/ansible/myansible/bin/ansible-playbook
+- name: Error Handling Part I
+  hosts: all
+  remote_user: ec2-user
+  become: 'yes'
+  become_user: root
+
+  vars:
+    anonymous_enable: yes
+    local_enable: yes
+    write_enable: yes
+    anon_upload_enable: yes
+
+  tasks:
+    - block:
+        - name: install vsftp
+          yum: 
+            name: vsftpd
+
+        - name: take backup of existing config
+          copy:
+            src: /etc/vsftpd/vsftpd.conf
+            dest: /etc/vsftpd/vsftpd.conf.bkp
+            remote_src: yes
+        
+        - name: use Jinja2 template to configure vsftpd
+          template:
+            src: vsftpd.j2
+            dest: /etc/vsftpd/vsftpd.conf
+
+        - name: View Custom Jinja Teamplate values
+          command: "cat /etc/vsftpd/vsftpd.conf"
+          register: jinja_out
+        - debug: var=jinja_out
+        
+        - name: This will fail
+          command: "ls -l /tmp/does-not-exist"
+
+        
+      rescue:
+        - name: Recovery block
+          debug:
+            msg: "something failed, restoring vsftpd.conf from backup"
+
+        - name: 
+          copy:
+            src: /etc/vsftpd/vsftpd.conf.bkp
+            dest: /etc/vsftpd/vsftpd.conf
+            remote_src: yes 
+
+        - name: View vsftd.conf values
+          command: "cat /etc/vsftpd/vsftpd.conf"
+          register: conf_out
+        - debug: var=conf_out        
+
+
+      always:
+        - name: Restarting vsftpd
+          service:
+            name: vsftpd
+            state: restarted
+    
+
+-----------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
