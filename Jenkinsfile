@@ -1,115 +1,35 @@
 pipeline {
     agent any
     tools {
-        maven 'maven-3.8.5'
-    }
-    environment {
-        DOCKER_TAG = "getVersion"
+        maven 'maven3'
+        jdk 'jdk8'
     }
     stages {
-        stage ('Git Checkout') {
-             git 'https://github.com/navr24396/hello-world.git'
-        }
-        stage ("Maven Build") {
+        stage ('Maven Build') {
             steps {
-                sh "mvn clean package"
+                sh 'mvn clean package'
             }
         }
-        stage ("Email Notification") {
+        stage ('Copy Artifact') {
             steps {
-                emailext body: 'BuILD IS SUCCESSFULL', recipientProviders: [developers()], subject: 'Build Success', to: 'navr243@gmail.com'
+                sh 'cp -r target/*.jar docker'                          #in docker folder dockerfile is present
             }
         }
-        stage ('SonarQube analysis') {
-           steps {
-                withSonarQubeEnv('sonar6')
-                sh 'mvn sonar:sonar'
-           }
-        }
-        stage ("Quality Gate") {
+        stage ('Build docker image and push to dockerhub') {
             steps {
-                timeout(time: 1, unit: 'HOURS')
-                waitForQualityGate abortPipeline: true
-
-            }
-        }
-        stage ("Artifactory configurtion") {
-            steps {
-                rtMavenDeployer (
-                    id: 'maven_deployer',
-                    serverId: 'jfrog',
-                    releaseRepo: 'libs-release-local',
-                    snapshotRepo: 'libs-snapshot-local'
-                )
-            }
-        }
-        stage ('Publish build info') {
-            steps {
-                rtPublishBuildInfo (
-                    serverId: 'jfrog'
-                )
-            }
-        }
-        stage ("Deploy war/ear to a container - tomcat") {
-            steps {
-               deploy adapters: [tomcat9(credentialsId: 'tomcat-server', path: '', url: 'http://52.206.189.28:8080')], contextPath: null, war: '**/*.war'
-            }
-        }
-        stage ("Docker Build") {
-            steps {
-                sh 'docker image build -t ashok355/***:${DOCKER_TAG}'
-            }
-        }
-        stage ("Docker Push") {
-            steps {
-                withCredentials([string(credentialsId: 'docker-hub', variable: 'dockerHubPwd')]) {
-                sh 'docker login -u ashok355 -p ${dockerHubPwd}'
+                script {
+                    def customImage = docker.build('ashok355/<image name>', "./docker")         #docker build -t ashok355/<image name> <dockerfile path>
+                    docker.withRegistry('https://registry.hub.docker.com', '<dockerhub credentials ID>')        #docker hub credentials
+                    customImage.push("${env.BUILD_NUMBER}")
                 }
-                sh 'docker push ashok355/***:${DOCKER_TAG}'
             }
         }
-        stage ('Docker Deploy') {
-            ansiblePlaybook credentialsId: 'dev-server', disableHostKeyChecking: true, extras: "-e DOCKER_TAG=${DOCKER_TAG}", installation: 'ansible', inventory: 'dev.inv', playbook: 'deploy-docker.yml'
+        stage ('Deploy to k8s using helm') {
+            steps {
+                sh 'cp -R helm/* .'                             #copies helm charts to current dir
+                sh '/usr/local/bin/helm upgrade --install petclinic-app petclinic --set image.repository=ashok355/<image name> --set image.tag=1'       #optioanl --set
             }
         }
-        stage ('k8s deploy') {
-            kubernetesDeploy(
-                configs: 'MyAwesomeApp/springboot-lb.yaml',
-                    kubeconfigId: 'K8S',
-                    enableConfigSubstitution: true
-            )
-                    
-        }
     }
+
 }
-
-def getVersion(){
-    def commitHash = sh label: '', returnStdout: true, script: 'git rev-parse --short HEAD'
-    return commitHash
-}
-
-        }
-    }
-}   
-
-def getVersion() {
-    def commitHash = sh returnStdout: true, script: 'git rev-parse --short HEAD'
-    return commitHash
-}    
-
-
-
-
-Plugins used
-git = git: Git
-maven = directly wrote 
-mail = emailtext: Extended email
-sonar = search for sonarqube jenkinsfile, official documentation
-artifactory = search for jfrog artifactory jenkinsfile, official documentation
-tomcat = deploy: Deploy war/ear to a container
-docker build = directly wrote 
-docker push = withCredentials: bind credentials to variables
-docker deploy = ansiblePlaybook: Invoke an ansible playbook
-tools = click Generate Declarative Directive and select tools
-Environment  = click Generate Declarative Directive and select tools
-k8s = kubernetesDeploy: Deploy to kubernetes
