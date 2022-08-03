@@ -145,6 +145,8 @@ docker ps -s 				#shows container size i.e amount of data used for writable laye
 Dockerfile instructions
 ***********************
 FROM = Using this we can define base image for building our custom application image
+COPY =  The COPY instruction lets us copy a file (or files) from the host system into the image
+ADD = ADD command is used to copy files/directories into a Docker image.It can also copy files from a URL
 LABEL = Adds metadata to the image
 RUN =  This instruction executes any valid command
 EXPOSE = tells docker that container is listening to the to the specific netowrk port
