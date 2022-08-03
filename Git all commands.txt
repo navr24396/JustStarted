@@ -70,3 +70,16 @@ git pull --rebase = If we use git pull then it will create an extra commit which
 git config --global alias.<name> 'log –graph –decorate –pretty=oneline –abbrev-commit'           #to create alias
 #Git Ignore = In the .gitignore file specify the files and folders which you want to ignores which you want to ignore
 #git branch --set-upstream-to=origin/master master = When you set up local repo first and then push the changes then we need to set the upstream
+*Git stash
+---------
+Git stash temporarily saves your data safely without committing
+git stash = save temporarily
+git stash save "<Stashing Message>" = stash a change with a message
+git stash list = To check the stored stashes
+git stash apply = re-apply the changes that you stashed by using the git stash command i.e repository is restored to its previous state before stash
+git stash apply <stash id> = In case of more than one stash, to apply a particular stash,If we don't specify a stash id, Git applies the most recent stash 
+git stash pop = similar to git stash apply, only diff is stash pop command deletes the stash from the stack after it is applied.
+git stash drop = The git stash drop command is used to delete a stash from the queue. Generally, it deletes the most recent stash
+git stash drop <stash id> = to delete a particular stash
+git stash clear = deletes all the stashes that exist in the repository
+git stash branch <Branch Name> = stash work on a separate branch to avoid conflicts during merging
